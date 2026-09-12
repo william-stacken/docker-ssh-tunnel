@@ -1,0 +1,10 @@
+#!/bin/sh -ue
+
+SCRIPTDIR="$(cd "$(dirname "$0")/"; pwd -P)"
+KEY_PATH="$SCRIPTDIR/keys"
+
+mkdir -p "$KEY_PATH"
+ssh-keygen -q -t ed25519 -C only-used-for-testing -N "" -f "$KEY_PATH/id_ed25519"
+
+PUB_KEY=$(cat "$KEY_PATH/id_ed25519.pub")
+echo "TUNNEL_PUBLIC_KEY=$PUB_KEY" > "$SCRIPTDIR/.env"

@@ -1,0 +1,41 @@
+#!/bin/sh -ue
+
+AUTHKEY_POLICY_NAME=""
+if [ "$TUNNEL_DIRECTION" = "local" ]; then
+    echo "GatewayPorts no" > /etc/ssh/sshd_config
+    AUTHKEY_POLICY_NAME="permitopen"
+elif [ "$TUNNEL_DIRECTION" = "remote" ]; then
+    echo "GatewayPorts clientspecified" > /etc/ssh/sshd_config
+    AUTHKEY_POLICY_NAME="permitlisten"
+else
+    echo "Invalid tunnel direction: '$TUNNEL_DIRECTION'"
+    exit 1
+fi
+
+echo "AllowTcpForwarding $TUNNEL_DIRECTION" >> /etc/ssh/sshd_config
+echo "PasswordAuthentication no" >> /etc/ssh/sshd_config
+echo "X11Forwarding no" >> /etc/ssh/sshd_config
+echo "AuthorizedKeysFile .ssh/authorized_keys" >> /etc/ssh/sshd_config
+
+if id "$TUNNEL_USER" >/dev/null 2>&1; then
+    # Delete the user in case the container restarted, for idempotency
+    deluser --remove-home  "$TUNNEL_USER" 2>/dev/null
+fi
+
+adduser "$TUNNEL_USER" -s /bin/false -h "/home/$TUNNEL_USER" -D
+# Passwordless users cannot be logged into even with public key authentication.
+# But this can appearently be bypassed by adding an asterisk to /etc/passwd
+sed -i "s/$TUNNEL_USER:!:/$TUNNEL_USER:*:/" /etc/shadow
+
+mkdir -p "/home/$TUNNEL_USER/.ssh"
+echo "restrict,port-forwarding,$AUTHKEY_POLICY_NAME=\"$TUNNEL_ENDPOINT\" $TUNNEL_PUBLIC_KEY" \
+    > "/home/$TUNNEL_USER/.ssh/authorized_keys"
+
+chown -R "$TUNNEL_USER:$TUNNEL_USER" "/home/$TUNNEL_USER/.ssh"
+chmod 700 "/home/$TUNNEL_USER/.ssh"
+chmod 600 "/home/$TUNNEL_USER/.ssh/authorized_keys"
+
+# Generate host keys if they don't exist
+ssh-keygen -A
+
+exec /usr/sbin/sshd -D "$@"
