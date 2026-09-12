@@ -1,0 +1,45 @@
+#!/bin/sh
+
+SCRIPTDIR="$(cd "$(dirname "$0")/"; pwd -P)"
+KEY_PATH="$SCRIPTDIR/keys/id_ed25519"
+
+assert_equal() {
+    if [ "$1" != "$2" ]; then
+        echo "Assertion failed: $1 != $2"
+        exit 1
+    fi
+}
+
+# Command invocations should be disabled
+ssh -o "IdentitiesOnly=yes" -i "$KEY_PATH" tunneluser@localhost -p 2222 whoami
+assert_equal "$?" 1
+
+ssh -o "IdentitiesOnly=yes" -i "$KEY_PATH" tunneluser@localhost -p 2223 whoami
+assert_equal "$?" 1
+
+# PTY allocation should be disabled
+ssh -o "IdentitiesOnly=yes" -i "$KEY_PATH" tunneluser@localhost -p 2222
+assert_equal "$?" 1
+
+ssh -o "IdentitiesOnly=yes" -i "$KEY_PATH" tunneluser@localhost -p 2223
+assert_equal "$?" 1
+
+# Local forwarding should work
+ssh -o "IdentitiesOnly=yes" -i "$KEY_PATH" -NL 5555:private-server:4444 tunneluser@localhost -p 2222 &
+TUNNEL_PID="$!"
+sleep 0.2
+REPLY=$(socat - TCP:localhost:5555)
+kill "$TUNNEL_PID"
+wait "$TUNNEL_PID" 2>/dev/null
+
+assert_equal "$REPLY" "Who-the-hell-do-you-think-I-am Kick!"
+
+# Remote forwarding should work
+ssh -o "IdentitiesOnly=yes" -i "$KEY_PATH" -NR 0.0.0.0:4444:localhost:5555 tunneluser@localhost -p 2223 &
+TUNNEL_PID="$!"
+sleep 0.2
+REPLY=$(socat TCP-LISTEN:5555 -)
+kill "$TUNNEL_PID"
+wait "$TUNNEL_PID" 2>/dev/null
+
+assert_equal "$REPLY" "Hands-off-my-beloved-little-brother Punch!"

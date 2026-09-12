@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install socat
+        run: sudo apt-get update && sudo apt-get install -y socat
+      
+      - name: Setup docker environment
+        run: |
+          cd test
+          ./setup
+          docker compose up -d
+
+      - name: Trust host keys
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          for i in {1..10}; do
+            ssh-keyscan -t ed25519 -p 2222 localhost >> ~/.ssh/known_hosts && echo "Port 2222 ready" && break
+            sleep 0.1
+          done
+          for i in {1..10}; do
+            ssh-keyscan -t ed25519 -p 2223 localhost >> ~/.ssh/known_hosts && echo "Port 2223 ready" && break
+            sleep 0.1
+          done
+      
+      - name: Run tests
+        run: ./test/test

@@ -1,0 +1,22 @@
+#!/bin/sh -ue
+
+SCRIPTDIR="$(cd "$(dirname "$0")/"; pwd -P)"
+
+REGISTRY="${REGISTRY:-ghcr.io}"
+REPOSITORY="william-stacken/docker-ssh-tunnel"
+IMAGE_NAME="${REGISTRY}/william-stacken/ssh-tunnel"
+TAG="${TAG:-latest}"
+
+# Log in to GitHub Container Registry if credentials are provided
+if [ -n "${GITHUB_TOKEN:-}" ]; then
+    echo "Logging in to $REGISTRY..."
+    echo "$GITHUB_TOKEN" | docker login "$REGISTRY" -u "${GITHUB_ACTOR:-github-actions}" --password-stdin
+fi
+
+echo "Building and pushing $IMAGE_NAME:$TAG..."
+docker buildx build --push \
+    --tag "${IMAGE_NAME}:${TAG}" \
+    --tag "${IMAGE_NAME}:latest" \
+    "$SCRIPTDIR/src/"
+
+echo "Successfully published to $IMAGE_NAME"

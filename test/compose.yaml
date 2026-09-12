@@ -1,0 +1,57 @@
+services:
+  # Local port forwarding test
+  ssh-tunnel-local:
+    build:
+      context: ../src
+      dockerfile: Dockerfile
+    depends_on:
+      - private-server
+    environment:
+      TUNNEL_DIRECTION: local
+      TUNNEL_USER: tunneluser
+      TUNNEL_ENDPOINT: private-server:4444
+      TUNNEL_PUBLIC_KEY: ${TUNNEL_PUBLIC_KEY}
+    volumes:
+      - ./etc/local:/etc/ssh
+    ports:
+      - "2222:22"
+
+  private-server:
+    image: alpine/socat
+    entrypoint: /bin/sh
+    stop_grace_period: 50ms
+    command:
+      - -c
+      - |
+        echo "private server listening on 4444"
+        socat -v TCP-LISTEN:4444,fork SYSTEM:'echo "Who-the-hell-do-you-think-I-am Kick!"'
+
+  # Remote forwarding test
+  ssh-tunnel-remote:
+    build:
+      context: ../src
+      dockerfile: Dockerfile
+    environment:
+      TUNNEL_DIRECTION: remote
+      TUNNEL_USER: tunneluser
+      TUNNEL_ENDPOINT: 0.0.0.0:4444
+      TUNNEL_PUBLIC_KEY: ${TUNNEL_PUBLIC_KEY}
+    volumes:
+      - ./etc/remote:/etc/ssh
+    ports:
+      - "2223:22"
+
+  private-client:
+    image: alpine/socat
+    entrypoint: /bin/sh
+    stop_grace_period: 50ms
+    depends_on:
+      - ssh-tunnel-remote
+    command:
+      - -c
+      - |
+        echo "private client attempting send to remote tunnel on 4444"
+        while true; do
+          echo "Hands-off-my-beloved-little-brother Punch!" | socat - TCP:ssh-tunnel-remote:4444 2>/dev/null || true
+          sleep 2
+        done
