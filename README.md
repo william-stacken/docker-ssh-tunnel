@@ -19,6 +19,21 @@ The tunnel is configured through the following environment variables:
 - `TUNNEL_PUBLIC_KEY`: The public key for the user the tunnel runs under.
 
 ## Usage
+Docker compose example:
+```yml
+services:
+  tunnel:
+    image: ghcr.io/william-stacken/ssh-tunnel:latest
+    environment:
+      TUNNEL_USER: tunnel
+      TUNNEL_PUBLIC_KEY: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIDO2tvIOSuhNvK7fkE7gAkUXPbFa5hRujmnH0G1Wdy0 only-used-for-testing
+      TUNNEL_DIRECTION: local # or remote
+      TUNNEL_ENDPOINT: www.mysite.internal:80
+    volumes:
+      - my-ssh-config:/etc/ssh
+    ports:
+      - "127.0.0.1:2222:22"
+```
 The client sets up local port forwarding using this command:
 ```sh
 ssh -NL "localhost:5555:$TUNNEL_ENDPOINT" "$TUNNEL_USER@$TUNNEL_HOST"
